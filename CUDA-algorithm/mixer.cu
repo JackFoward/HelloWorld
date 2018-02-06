@@ -10,7 +10,7 @@
  *  a software license from RidgeRun.  All source code changes must be provided    *  back to RidgeRun without any encumbrance.
  */
 
-
+#include "stdio.h"
 #include "mixer.h"
 
 __global__ void
