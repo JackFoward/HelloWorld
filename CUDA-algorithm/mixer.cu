@@ -9,7 +9,7 @@
  *  RidgeRun, LLC.  The user is free to modify the source code after obtaining
  *  a software license from RidgeRun.  All source code changes must be provided    *  back to RidgeRun without any encumbrance.
  */
-/*Hi there*/
+
 #include "stdio.h"
 #include "mixer.h"
 
