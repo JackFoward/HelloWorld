@@ -11,7 +11,7 @@ sudo chown root:root /etc/sysctl.conf
 
 #Enables Foreal custom logo splashscreen
 sudo mkdir /usr/share/plymouth/themes/foreal-logo/
-sudo cp -a /home/ubuntu/foreal-logo.png /usr/share/plymouth/themes/foreal-logo/
+sudo cp -a /home/ubuntu/foreal-logo.png /usr/share/plymouth/themes/foreal-logo/logo wat #1st pull
 sudo cp -a /home/ubuntu/files-to-overwrite/plymouthd.defaults /usr/share/plymouth/plymouthd.defaults
 sudo cp -a /home/ubuntu/files-to-overwrite/foreal-logo.plymouth /usr/share/plymouth/themes/foreal-logo/foreal-logo.plymouth
 sudo cp -a /home/ubuntu/files-to-overwrite/foreal-logo.script /usr/share/plymouth/themes/foreal-logo/foreal-logo.script
@@ -31,4 +31,7 @@ sudo apt update
 
 #Create the directory that will contain all the media-files of the control-console system
 mkdir /home/ubuntu/media-files
+
+
+this is a first pull!
 
