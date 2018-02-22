@@ -1,0 +1,104 @@
+#!/bin/bash
+ 
+echo -e "\n ====== Digital Camera Example (Switch the scr_pipe to listen in runtime) ====== \n"
+ 
+END_MSJ="!!! Digital Camera Example Finished !!!"
+REC_INDEX=0
+ 
+# Graceful cleanup upon CTRL-C
+trap "gstd-client pipeline_delete cam_src_pipe; gstd-client pipeline_delete live_preview_pipe; "\
+"gstd-client pipeline_delete recording_pipe; gstd-client pipeline_delete snapshot_pipe; echo -e $END_MSJ; exit" SIGINT
+ 
+# Create pipelines
+echo -e "\n ====> Create the cam_src_pipe \n"
+gstd-client pipeline_create cam_src_pipe nvcamerasrc wbmode=1 queue-size=10 sensor-id=0 fpsRange=30,30 \
+! capsfilter caps=video/x-raw\(memory:NVMM\),width=1920,height=1080,format=I420,framerate=30/1 \
+! nvvidconv ! capsfilter caps=video/x-raw,width=1920,height=1080,format=I420,framerate=30/1 \
+! queue max-size-buffers=2 leaky=downstream \
+! interpipesink name=cam_src caps="video/x-raw,width=1920,height=1080,format=I420,framerate=30/1" sync=false enable-last-sample=false drop=true \
+max-buffers=1 async=false
+ 
+echo -e "\n ====> Create the video_sink_pipe \n"
+gstd-client pipeline_create live_preview_pipe interpipesrc name=live_prev_intpsrc listen-to=cam_src \
+is-live=true accept-events=false accept-eos-event=false enable-sync=false allow-renegotiation=false \
+! fakesink async=false sync=false
+ 
+echo -e "\n ====> Create the recording_pipe \n"
+gstd-client pipeline_create recording_pipe interpipesrc name=rec_intpsrc listen-to=cam_src is-live=true \
+allow-renegotiation=false enable-sync=false format=time accept-events=false accept-eos-event=false \
+caps="video/x-raw,width=1920,height=1080,format=I420,framerate=30/1" \
+! omxh264enc iframeinterval=30 SliceIntraRefreshInterval=5 SliceIntraRefreshEnable=true ! h264parse \
+! mp4mux dts-method=2 ! filesink name=rec_file_sink location=/home/ubuntu/control-media-server/recording_$REC_INDEX.mp4 enable-last-sample=false sync=false async=false buffer-mode=2
+ 
+echo -e "\n ====> Create the snapshot_pipe \n"
+gstd-client pipeline_create snapshot_pipe interpipesrc name=snap_intpsrc listen-to=cam_src num-buffers=1 \
+accept-events=false accept-eos-event=false enable-sync=false allow-renegotiation=false \
+! nvjpegenc ! multifilesink location=/home/ubuntu/control-media-server/snapshot_%d.jpg sync=false async=false enable-last-sample=false
+ 
+ 
+# Change pipelines to PLAYING STATE
+echo -e "\n ====> Start cam_src_pipe and live_preview_pipe \n"
+gstd-client pipeline_play cam_src_pipe
+gstd-client pipeline_play live_preview_pipe
+ 
+# Enable recording procedure
+function enable_rec {
+        gstd-client element_set recording_pipe rec_file_sink location /home/ubuntu/control-media-server/recording_$REC_INDEX.mp4
+        gstd-client pipeline_play recording_pipe
+}
+ 
+# Disable recording procedure
+function disable_rec {
+        gstd-client element_set recording_pipe rec_intpsrc listen-to NULL
+        gstd-client bus_filter recording_pipe eos
+        gstd-client event_eos recording_pipe
+        gstd-client bus_read recording_pipe
+        gstd-client pipeline_stop recording_pipe
+        gstd-client element_set recording_pipe rec_intpsrc listen-to cam_src
+        REC_INDEX=$(($REC_INDEX+1))
+}
+ 
+# Take snapshot procedure
+function take_snap {
+        gstd-client bus_filter snapshot_pipe eos
+        gstd-client bus_timeout snapshot_pipe 1000000000
+        gstd-client pipeline_play snapshot_pipe
+        gstd-client bus_read snapshot_pipe
+        gstd-client element_set snapshot_pipe snap_intpsrc listen-to NULL
+        gstd-client event_flush_start snapshot_pipe
+        gstd-client event_flush_stop snapshot_pipe false
+        gstd-client pipeline_stop snapshot_pipe
+        gstd-client element_set snapshot_pipe snap_intpsrc listen-to cam_src
+}
+ 
+ 
+echo -e "\n====> Press S to take a snapshot or R to start recording video for 15 seconds \n"
+echo -e "====> Type Ctrl+C to stop the example execution, otherwise it will iterate infinitely!\n"
+ 
+ 
+# Start requesting actions to the user
+while :
+do
+        read -rsn1 input
+ 
+        if [ "$input" = "s" ];
+        then
+                echo -e "\n====> Take snapshot! \n"
+                take_snap
+                echo -e "\n====> Snapshot Taken! \n"
+                echo -e "\n====> Press S to take a snapshot or R to start recording video for 15 seconds \n"
+                echo -e "====> Type Ctrl+C to stop the example execution, otherwise it will iterate infinitely!\n"
+        fi
+ 
+        if [ "$input" = "r" ];
+        then
+                enable_rec
+                echo -e "\n====> Start to record video! \n"
+                sleep 15
+                disable_rec
+                echo -e "\n====> Finish to record video! \n"
+                echo -e "\n====> Press S to take a snapshot or R to start recording video for 15 seconds \n"
+                echo -e "====> Type Ctrl+C to stop the example execution, otherwise it will iterate infinitely!\n"
+        fi
+ 
+done
