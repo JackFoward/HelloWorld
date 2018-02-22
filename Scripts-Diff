@@ -1,7 +1,12 @@
 #!/bin/bash
  
-echo -e "\n ====== Digital Camera Example (Switch the scr_pipe to listen in runtime) ====== \n"
- 
+echo -e "\n ====== V4L2src media-server test script ====== \n\n"
+
+echo -e "----> Creating directory where media files will be stored: /home/ubuntu/media-server-test/v4l2src \n\n"
+
+mkdir -p /home/ubuntu/media-server-test/v4l2src
+
+
 END_MSJ="!!! Digital Camera Example Finished !!!"
 REC_INDEX=0
  
@@ -11,11 +16,10 @@ trap "gstd-client pipeline_delete cam_src_pipe; gstd-client pipeline_delete live
  
 # Create pipelines
 echo -e "\n ====> Create the cam_src_pipe \n"
-gstd-client pipeline_create cam_src_pipe nvcamerasrc wbmode=1 queue-size=10 sensor-id=0 fpsRange=30,30 \
-! capsfilter caps=video/x-raw\(memory:NVMM\),width=1920,height=1080,format=I420,framerate=30/1 \
-! nvvidconv ! capsfilter caps=video/x-raw,width=1920,height=1080,format=I420,framerate=30/1 \
+gstd-client pipeline_create cam_src_pipe v4l2src device=/dev/video3 \
+! capsfilter caps=video/x-raw,width=1920,height=1080,format=I420,framerate=15/1 \
 ! queue max-size-buffers=2 leaky=downstream \
-! interpipesink name=cam_src caps="video/x-raw,width=1920,height=1080,format=I420,framerate=30/1" sync=false enable-last-sample=false drop=true \
+! interpipesink name=cam_src caps="video/x-raw,width=1920,height=1080,format=I420,framerate=15/1" sync=false enable-last-sample=false drop=true \
 max-buffers=1 async=false
  
 echo -e "\n ====> Create the video_sink_pipe \n"
@@ -25,15 +29,15 @@ is-live=true accept-events=false accept-eos-event=false enable-sync=false allow-
  
 echo -e "\n ====> Create the recording_pipe \n"
 gstd-client pipeline_create recording_pipe interpipesrc name=rec_intpsrc listen-to=cam_src is-live=true \
-allow-renegotiation=false enable-sync=false format=time accept-events=false accept-eos-event=false \
-caps="video/x-raw,width=1920,height=1080,format=I420,framerate=30/1" \
-! omxh264enc iframeinterval=30 SliceIntraRefreshInterval=5 SliceIntraRefreshEnable=true ! h264parse \
-! mp4mux dts-method=2 ! filesink name=rec_file_sink location=/home/ubuntu/control-media-server/recording_$REC_INDEX.mp4 enable-last-sample=false sync=false async=false buffer-mode=2
+allow-renegotiation=true enable-sync=false format=time accept-events=false accept-eos-event=false \
+caps="video/x-raw,width=1920,height=1080,format=I420,framerate=15/1" \
+! omxh264enc iframeinterval=15 SliceIntraRefreshInterval=5 SliceIntraRefreshEnable=true ! h264parse \
+! mp4mux dts-method=2 ! filesink name=rec_file_sink location=/home/ubuntu/media-server-test/v4l2src/recording_$REC_INDEX.mp4 enable-last-sample=false sync=false async=false buffer-mode=2
  
 echo -e "\n ====> Create the snapshot_pipe \n"
 gstd-client pipeline_create snapshot_pipe interpipesrc name=snap_intpsrc listen-to=cam_src num-buffers=1 \
 accept-events=false accept-eos-event=false enable-sync=false allow-renegotiation=false \
-! nvjpegenc ! multifilesink location=/home/ubuntu/control-media-server/snapshot_%d.jpg sync=false async=false enable-last-sample=false
+! nvjpegenc ! multifilesink location=/home/ubuntu/media-server-test/v4l2src/snapshot_%d.jpg sync=false async=false enable-last-sample=false
  
  
 # Change pipelines to PLAYING STATE
@@ -43,7 +47,7 @@ gstd-client pipeline_play live_preview_pipe
  
 # Enable recording procedure
 function enable_rec {
-        gstd-client element_set recording_pipe rec_file_sink location /home/ubuntu/control-media-server/recording_$REC_INDEX.mp4
+        gstd-client element_set recording_pipe rec_file_sink location /home/ubuntu/media-server-test/v4l2src/recording_$REC_INDEX.mp4
         gstd-client pipeline_play recording_pipe
 }
  
@@ -102,3 +106,4 @@ do
         fi
  
 done
+
